@@ -1,0 +1,11 @@
+add_llvm_component_library(LLVMRISCXDesc
+  RISCXAsmBackend.cpp
+  RISCXELFObjectWriter.cpp
+  RISCXInstPrinter.cpp
+  RISCXMCAsmInfo.cpp
+  RISCXMCCodeEmitter.cpp
+  RISCXMCExpr.cpp
+  RISCXMCTargetDesc.cpp
+  RISCXTargetStreamer.cpp
+  RISCXELFStreamer.cpp
+)
