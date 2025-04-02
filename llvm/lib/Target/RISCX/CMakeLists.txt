@@ -2,7 +2,6 @@ set(LLVM_TARGET_DEFINITIONS RISCX.td)
 
 tablegen(LLVM RISCXGenAsmMatcher.inc -gen-asm-matcher)
 tablegen(LLVM RISCXGenAsmWriter.inc -gen-asm-writer)
-tablegen(LLVM RISCXGenCompressInstEmitter.inc -gen-compress-inst-emitter)
 tablegen(LLVM RISCXGenDAGISel.inc -gen-dag-isel)
 tablegen(LLVM RISCXGenDisassemblerTables.inc -gen-disassembler)
 tablegen(LLVM RISCXGenGlobalISel.inc -gen-global-isel)

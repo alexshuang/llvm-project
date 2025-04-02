@@ -30,10 +30,6 @@ using namespace llvm;
 #define PRINT_ALIAS_INSTR
 #include "RISCXGenAsmWriter.inc"
 
-// Include the auto-generated portion of the compress emitter.
-#define GEN_UNCOMPRESS_INSTR
-#include "RISCXGenCompressInstEmitter.inc"
-
 static cl::opt<bool>
     NoAliases("riscx-no-aliases",
               cl::desc("Disable the emission of assembler pseudo instructions"),
@@ -68,11 +64,6 @@ void RISCXInstPrinter::printInst(const MCInst *MI, uint64_t Address,
                                  raw_ostream &O) {
   bool Res = false;
   const MCInst *NewMI = MI;
-  MCInst UncompressedMI;
-  if (!NoAliases)
-    Res = uncompressInst(UncompressedMI, *MI, MRI, STI);
-  if (Res)
-    NewMI = const_cast<MCInst *>(&UncompressedMI);
   if (NoAliases || !printAliasInstr(NewMI, STI, O))
     printInstruction(NewMI, Address, STI, O);
   printAnnotation(O, Annot);

@@ -83,32 +83,6 @@ void RISCXAsmBackend::relaxInstruction(const MCInst &Inst,
   switch (Inst.getOpcode()) {
   default:
     llvm_unreachable("Opcode not expected!");
-  case RISCX::C_BEQZ:
-    // c.beqz $rs1, $imm -> beq $rs1, X0, $imm.
-    Res.setOpcode(RISCX::BEQ);
-    Res.addOperand(Inst.getOperand(0));
-    Res.addOperand(MCOperand::createReg(RISCX::X0));
-    Res.addOperand(Inst.getOperand(1));
-    break;
-  case RISCX::C_BNEZ:
-    // c.bnez $rs1, $imm -> bne $rs1, X0, $imm.
-    Res.setOpcode(RISCX::BNE);
-    Res.addOperand(Inst.getOperand(0));
-    Res.addOperand(MCOperand::createReg(RISCX::X0));
-    Res.addOperand(Inst.getOperand(1));
-    break;
-  case RISCX::C_J:
-    // c.j $imm -> jal X0, $imm.
-    Res.setOpcode(RISCX::JAL);
-    Res.addOperand(MCOperand::createReg(RISCX::X0));
-    Res.addOperand(Inst.getOperand(0));
-    break;
-  case RISCX::C_JAL:
-    // c.jal $imm -> jal X1, $imm.
-    Res.setOpcode(RISCX::JAL);
-    Res.addOperand(MCOperand::createReg(RISCX::X1));
-    Res.addOperand(Inst.getOperand(0));
-    break;
   }
 }
 
@@ -118,13 +92,6 @@ unsigned RISCXAsmBackend::getRelaxedOpcode(unsigned Op) const {
   switch (Op) {
   default:
     return Op;
-  case RISCX::C_BEQZ:
-    return RISCX::BEQ;
-  case RISCX::C_BNEZ:
-    return RISCX::BNE;
-  case RISCX::C_J:
-  case RISCX::C_JAL: // fall through.
-    return RISCX::JAL;
   }
 }
 

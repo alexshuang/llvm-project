@@ -31,23 +31,9 @@ RISCXTargetELFStreamer::RISCXTargetELFStreamer(MCStreamer &S,
 
   unsigned EFlags = MCA.getELFHeaderEFlags();
 
-  if (Features[RISCX::FeatureStdExtC])
-    EFlags |= ELF::EF_RISCX_RVC;
-
   switch (ABI) {
   case RISCXABI::ABI_ILP32:
   case RISCXABI::ABI_LP64:
-    break;
-  case RISCXABI::ABI_ILP32F:
-  case RISCXABI::ABI_LP64F:
-    EFlags |= ELF::EF_RISCX_FLOAT_ABI_SINGLE;
-    break;
-  case RISCXABI::ABI_ILP32D:
-  case RISCXABI::ABI_LP64D:
-    EFlags |= ELF::EF_RISCX_FLOAT_ABI_DOUBLE;
-    break;
-  case RISCXABI::ABI_ILP32E:
-    EFlags |= ELF::EF_RISCX_RVE;
     break;
   case RISCXABI::ABI_Unknown:
     llvm_unreachable("Improperly initialised target ABI");

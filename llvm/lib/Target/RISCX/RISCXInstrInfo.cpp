@@ -26,9 +26,6 @@
 
 using namespace llvm;
 
-#define GEN_CHECK_COMPRESS_INSTR
-#include "RISCXGenCompressInstEmitter.inc"
-
 #define GET_INSTRINFO_CTOR_DTOR
 #include "RISCXGenInstrInfo.inc"
 
@@ -46,10 +43,6 @@ unsigned RISCXInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   case RISCX::LH:
   case RISCX::LHU:
   case RISCX::LW:
-  case RISCX::FLW:
-  case RISCX::LWU:
-  case RISCX::LD:
-  case RISCX::FLD:
     break;
   }
 
@@ -70,9 +63,6 @@ unsigned RISCXInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
   case RISCX::SB:
   case RISCX::SH:
   case RISCX::SW:
-  case RISCX::FSW:
-  case RISCX::SD:
-  case RISCX::FSD:
     break;
   }
 
@@ -98,12 +88,6 @@ void RISCXInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 
   // FPR->FPR copies
   unsigned Opc;
-  if (RISCX::FPR32RegClass.contains(DstReg, SrcReg))
-    Opc = RISCX::FSGNJ_S;
-  else if (RISCX::FPR64RegClass.contains(DstReg, SrcReg))
-    Opc = RISCX::FSGNJ_D;
-  else
-    llvm_unreachable("Impossible reg-to-reg copy");
 
   BuildMI(MBB, MBBI, DL, get(Opc), DstReg)
       .addReg(SrcReg, getKillRegState(KillSrc))
@@ -122,12 +106,7 @@ void RISCXInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
   unsigned Opcode;
 
   if (RISCX::GPRRegClass.hasSubClassEq(RC))
-    Opcode = TRI->getRegSizeInBits(RISCX::GPRRegClass) == 32 ?
-             RISCX::SW : RISCX::SD;
-  else if (RISCX::FPR32RegClass.hasSubClassEq(RC))
-    Opcode = RISCX::FSW;
-  else if (RISCX::FPR64RegClass.hasSubClassEq(RC))
-    Opcode = RISCX::FSD;
+    Opcode = RISCX::SW;
   else
     llvm_unreachable("Can't store this register to stack slot");
 
@@ -149,12 +128,7 @@ void RISCXInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   unsigned Opcode;
 
   if (RISCX::GPRRegClass.hasSubClassEq(RC))
-    Opcode = TRI->getRegSizeInBits(RISCX::GPRRegClass) == 32 ?
-             RISCX::LW : RISCX::LD;
-  else if (RISCX::FPR32RegClass.hasSubClassEq(RC))
-    Opcode = RISCX::FLW;
-  else if (RISCX::FPR64RegClass.hasSubClassEq(RC))
-    Opcode = RISCX::FLD;
+    Opcode = RISCX::LW;
   else
     llvm_unreachable("Can't load this register from stack slot");
 
@@ -455,15 +429,6 @@ unsigned RISCXInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
 
   switch (Opcode) {
   default: {
-    if (MI.getParent() && MI.getParent()->getParent()) {
-      const auto MF = MI.getMF();
-      const auto &TM = static_cast<const RISCXTargetMachine &>(MF->getTarget());
-      const MCRegisterInfo &MRI = *TM.getMCRegisterInfo();
-      const MCSubtargetInfo &STI = *TM.getMCSubtargetInfo();
-      const RISCXSubtarget &ST = MF->getSubtarget<RISCXSubtarget>();
-      if (isCompressibleInst(MI, &ST, MRI, STI))
-        return 2;
-    }
     return get(Opcode).getSize();
   }
   case TargetOpcode::EH_LABEL:

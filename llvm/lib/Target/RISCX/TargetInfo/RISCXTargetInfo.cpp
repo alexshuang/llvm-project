@@ -21,8 +21,6 @@ Target &llvm::getTheRISCX64Target() {
 }
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCXTargetInfo() {
-  RegisterTarget<Triple::riscx32> X(getTheRISCX32Target(), "riscx32",
+  RegisterTarget<Triple::riscx> X(getTheRISCX32Target(), "riscx",
                                     "32-bit RISC-V", "RISCX");
-  RegisterTarget<Triple::riscx64> Y(getTheRISCX64Target(), "riscx64",
-                                    "64-bit RISC-V", "RISCX");
 }

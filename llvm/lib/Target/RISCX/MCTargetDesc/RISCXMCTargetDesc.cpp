@@ -94,7 +94,7 @@ static MCTargetStreamer *createRISCXAsmTargetStreamer(MCStreamer &S,
 }
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCXTargetMC() {
-  for (Target *T : {&getTheRISCX32Target(), &getTheRISCX64Target()}) {
+  for (Target *T : {&getTheRISCX32Target()}) {
     TargetRegistry::RegisterMCAsmInfo(*T, createRISCXMCAsmInfo);
     TargetRegistry::RegisterMCInstrInfo(*T, createRISCXMCInstrInfo);
     TargetRegistry::RegisterMCRegInfo(*T, createRISCXMCRegisterInfo);

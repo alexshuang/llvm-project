@@ -32,7 +32,7 @@ void generateInstSeq(int64_t Val, bool IsRV64, InstSeq &Res) {
       Res.push_back(Inst(RISCX::LUI, Hi20));
 
     if (Lo12 || Hi20 == 0) {
-      unsigned AddiOpc = (IsRV64 && Hi20) ? RISCX::ADDIW : RISCX::ADDI;
+      unsigned AddiOpc = RISCX::ADDI;
       Res.push_back(Inst(AddiOpc, Lo12));
     }
     return;

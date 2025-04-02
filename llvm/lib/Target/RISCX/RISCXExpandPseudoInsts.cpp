@@ -99,40 +99,6 @@ bool RISCXExpandPseudo::expandMI(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator MBBI,
                                  MachineBasicBlock::iterator &NextMBBI) {
   switch (MBBI->getOpcode()) {
-  case RISCX::PseudoAtomicLoadNand32:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 32,
-                             NextMBBI);
-  case RISCX::PseudoAtomicLoadNand64:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, false, 64,
-                             NextMBBI);
-  case RISCX::PseudoMaskedAtomicSwap32:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Xchg, true, 32,
-                             NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadAdd32:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Add, true, 32, NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadSub32:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Sub, true, 32, NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadNand32:
-    return expandAtomicBinOp(MBB, MBBI, AtomicRMWInst::Nand, true, 32,
-                             NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadMax32:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::Max, true, 32,
-                                NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadMin32:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::Min, true, 32,
-                                NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadUMax32:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::UMax, true, 32,
-                                NextMBBI);
-  case RISCX::PseudoMaskedAtomicLoadUMin32:
-    return expandAtomicMinMaxOp(MBB, MBBI, AtomicRMWInst::UMin, true, 32,
-                                NextMBBI);
-  case RISCX::PseudoCmpXchg32:
-    return expandAtomicCmpXchg(MBB, MBBI, false, 32, NextMBBI);
-  case RISCX::PseudoCmpXchg64:
-    return expandAtomicCmpXchg(MBB, MBBI, false, 64, NextMBBI);
-  case RISCX::PseudoMaskedCmpXchg32:
-    return expandAtomicCmpXchg(MBB, MBBI, true, 32, NextMBBI);
   case RISCX::PseudoLLA:
     return expandLoadLocalAddress(MBB, MBBI, NextMBBI);
   case RISCX::PseudoLA:
@@ -150,16 +116,6 @@ static unsigned getLRForRMW32(AtomicOrdering Ordering) {
   switch (Ordering) {
   default:
     llvm_unreachable("Unexpected AtomicOrdering");
-  case AtomicOrdering::Monotonic:
-    return RISCX::LR_W;
-  case AtomicOrdering::Acquire:
-    return RISCX::LR_W_AQ;
-  case AtomicOrdering::Release:
-    return RISCX::LR_W;
-  case AtomicOrdering::AcquireRelease:
-    return RISCX::LR_W_AQ;
-  case AtomicOrdering::SequentiallyConsistent:
-    return RISCX::LR_W_AQ_RL;
   }
 }
 
@@ -167,16 +123,6 @@ static unsigned getSCForRMW32(AtomicOrdering Ordering) {
   switch (Ordering) {
   default:
     llvm_unreachable("Unexpected AtomicOrdering");
-  case AtomicOrdering::Monotonic:
-    return RISCX::SC_W;
-  case AtomicOrdering::Acquire:
-    return RISCX::SC_W;
-  case AtomicOrdering::Release:
-    return RISCX::SC_W_RL;
-  case AtomicOrdering::AcquireRelease:
-    return RISCX::SC_W_RL;
-  case AtomicOrdering::SequentiallyConsistent:
-    return RISCX::SC_W_AQ_RL;
   }
 }
 
@@ -184,16 +130,6 @@ static unsigned getLRForRMW64(AtomicOrdering Ordering) {
   switch (Ordering) {
   default:
     llvm_unreachable("Unexpected AtomicOrdering");
-  case AtomicOrdering::Monotonic:
-    return RISCX::LR_D;
-  case AtomicOrdering::Acquire:
-    return RISCX::LR_D_AQ;
-  case AtomicOrdering::Release:
-    return RISCX::LR_D;
-  case AtomicOrdering::AcquireRelease:
-    return RISCX::LR_D_AQ;
-  case AtomicOrdering::SequentiallyConsistent:
-    return RISCX::LR_D_AQ_RL;
   }
 }
 
@@ -201,16 +137,6 @@ static unsigned getSCForRMW64(AtomicOrdering Ordering) {
   switch (Ordering) {
   default:
     llvm_unreachable("Unexpected AtomicOrdering");
-  case AtomicOrdering::Monotonic:
-    return RISCX::SC_D;
-  case AtomicOrdering::Acquire:
-    return RISCX::SC_D;
-  case AtomicOrdering::Release:
-    return RISCX::SC_D_RL;
-  case AtomicOrdering::AcquireRelease:
-    return RISCX::SC_D_RL;
-  case AtomicOrdering::SequentiallyConsistent:
-    return RISCX::SC_D_AQ_RL;
   }
 }
 
@@ -678,7 +604,7 @@ bool RISCXExpandPseudo::expandLoadAddress(
   unsigned FlagsHi;
   if (MF->getTarget().isPositionIndependent()) {
     const auto &STI = MF->getSubtarget<RISCXSubtarget>();
-    SecondOpcode = STI.is64Bit() ? RISCX::LD : RISCX::LW;
+    SecondOpcode = RISCX::LW;
     FlagsHi = RISCXII::MO_GOT_HI;
   } else {
     SecondOpcode = RISCX::ADDI;
@@ -693,7 +619,7 @@ bool RISCXExpandPseudo::expandLoadTLSIEAddress(
   MachineFunction *MF = MBB.getParent();
 
   const auto &STI = MF->getSubtarget<RISCXSubtarget>();
-  unsigned SecondOpcode = STI.is64Bit() ? RISCX::LD : RISCX::LW;
+  unsigned SecondOpcode = RISCX::LW;
   return expandAuipcInstPair(MBB, MBBI, NextMBBI, RISCXII::MO_TLS_GOT_HI,
                              SecondOpcode);
 }

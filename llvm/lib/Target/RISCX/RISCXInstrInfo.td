@@ -490,35 +490,6 @@ def CSRRWI : CSR_ii<0b101, "csrrwi">;
 def CSRRSI : CSR_ii<0b110, "csrrsi">;
 def CSRRCI : CSR_ii<0b111, "csrrci">;
 
-/// RV64I instructions
-
-let Predicates = [IsRV64] in {
-def LWU   : Load_ri<0b110, "lwu">, Sched<[WriteLDWU, ReadMemBase]>;
-def LD    : Load_ri<0b011, "ld">, Sched<[WriteLDD, ReadMemBase]>;
-def SD    : Store_rri<0b011, "sd">, Sched<[WriteSTD, ReadStoreData, ReadMemBase]>;
-
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
-def ADDIW : RVInstI<0b000, OPC_OP_IMM_32, (outs GPR:$rd),
-                    (ins GPR:$rs1, simm12:$imm12),
-                    "addiw", "$rd, $rs1, $imm12">,
-            Sched<[WriteIALU32, ReadIALU32]>;
-
-def SLLIW : ShiftW_ri<0, 0b001, "slliw">;
-def SRLIW : ShiftW_ri<0, 0b101, "srliw">;
-def SRAIW : ShiftW_ri<1, 0b101, "sraiw">;
-
-def ADDW  : ALUW_rr<0b0000000, 0b000, "addw">,
-            Sched<[WriteIALU32, ReadIALU32, ReadIALU32]>;
-def SUBW  : ALUW_rr<0b0100000, 0b000, "subw">,
-            Sched<[WriteIALU32, ReadIALU32, ReadIALU32]>;
-def SLLW  : ALUW_rr<0b0000000, 0b001, "sllw">,
-            Sched<[WriteIALU32, ReadIALU32, ReadIALU32]>;
-def SRLW  : ALUW_rr<0b0000000, 0b101, "srlw">,
-            Sched<[WriteIALU32, ReadIALU32, ReadIALU32]>;
-def SRAW  : ALUW_rr<0b0100000, 0b101, "sraw">,
-            Sched<[WriteIALU32, ReadIALU32, ReadIALU32]>;
-} // Predicates = [IsRV64]
-
 //===----------------------------------------------------------------------===//
 // Privileged instructions
 //===----------------------------------------------------------------------===//
@@ -581,20 +552,9 @@ def PseudoSB  : PseudoStore<"sb">;
 def PseudoSH  : PseudoStore<"sh">;
 def PseudoSW  : PseudoStore<"sw">;
 
-let Predicates = [IsRV64] in {
-def PseudoLWU : PseudoLoad<"lwu">;
-def PseudoLD  : PseudoLoad<"ld">;
-def PseudoSD  : PseudoStore<"sd">;
-} // Predicates = [IsRV64]
-
 def : InstAlias<"mv $rd, $rs",   (ADDI GPR:$rd, GPR:$rs,       0)>;
 def : InstAlias<"not $rd, $rs",  (XORI GPR:$rd, GPR:$rs,      -1)>;
 def : InstAlias<"neg $rd, $rs",  (SUB  GPR:$rd,      X0, GPR:$rs)>;
-
-let Predicates = [IsRV64] in {
-def : InstAlias<"negw $rd, $rs",   (SUBW  GPR:$rd,      X0, GPR:$rs)>;
-def : InstAlias<"sext.w $rd, $rs", (ADDIW GPR:$rd, GPR:$rs,       0)>;
-} // Predicates = [IsRV64]
 
 def : InstAlias<"seqz $rd, $rs", (SLTIU GPR:$rd, GPR:$rs,       1)>;
 def : InstAlias<"snez $rd, $rs", (SLTU  GPR:$rd,      X0, GPR:$rs)>;
@@ -716,23 +676,6 @@ def : InstAlias<"srl $rd, $rs1, $shamt",
                 (SRLI  GPR:$rd, GPR:$rs1, uimmlog2xlen:$shamt)>;
 def : InstAlias<"sra $rd, $rs1, $shamt",
                 (SRAI  GPR:$rd, GPR:$rs1, uimmlog2xlen:$shamt)>;
-let Predicates = [IsRV64] in {
-def : InstAlias<"lwu $rd, (${rs1})",
-                (LWU  GPR:$rd, GPR:$rs1, 0)>;
-def : InstAlias<"ld $rd, (${rs1})",
-                (LD  GPR:$rd, GPR:$rs1, 0)>;
-def : InstAlias<"sd $rs2, (${rs1})",
-                (SD  GPR:$rs2, GPR:$rs1, 0)>;
-
-def : InstAlias<"addw $rd, $rs1, $imm12",
-                (ADDIW  GPR:$rd, GPR:$rs1, simm12:$imm12)>;
-def : InstAlias<"sllw $rd, $rs1, $shamt",
-                (SLLIW  GPR:$rd, GPR:$rs1, uimm5:$shamt)>;
-def : InstAlias<"srlw $rd, $rs1, $shamt",
-                (SRLIW  GPR:$rd, GPR:$rs1, uimm5:$shamt)>;
-def : InstAlias<"sraw $rd, $rs1, $shamt",
-                (SRAIW  GPR:$rd, GPR:$rs1, uimm5:$shamt)>;
-} // Predicates = [IsRV64]
 def : InstAlias<"slt $rd, $rs1, $imm12",
                 (SLTI  GPR:$rd, GPR:$rs1, simm12:$imm12)>;
 def : InstAlias<"sltu $rd, $rs1, $imm12",
@@ -1058,49 +1001,7 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
 
 /// RV64 patterns
 
-let Predicates = [IsRV64] in {
-
-/// sext and zext
-
-def : Pat<(sext_inreg GPR:$rs1, i32), (ADDIW GPR:$rs1, 0)>;
-def : Pat<(and GPR:$rs1, 0xffffffff), (SRLI (SLLI GPR:$rs1, 32), 32)>;
-
-/// ALU operations
-
-def : Pat<(sext_inreg (add GPR:$rs1, GPR:$rs2), i32),
-          (ADDW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(sext_inreg (add GPR:$rs1, simm12:$imm12), i32),
-          (ADDIW GPR:$rs1, simm12:$imm12)>;
-def : Pat<(sext_inreg (sub GPR:$rs1, GPR:$rs2), i32),
-          (SUBW GPR:$rs1, GPR:$rs2)>;
-def : Pat<(sext_inreg (shl GPR:$rs1, uimm5:$shamt), i32),
-          (SLLIW GPR:$rs1, uimm5:$shamt)>;
-// (srl (zexti32 ...), uimm5:$shamt) is matched with custom code due to the
-// need to undo manipulation of the mask value performed by DAGCombine.
-def : Pat<(sra (sext_inreg GPR:$rs1, i32), uimm5:$shamt),
-          (SRAIW GPR:$rs1, uimm5:$shamt)>;
-
-def : PatGprGpr<riscx_sllw, SLLW>;
-def : PatGprGpr<riscx_srlw, SRLW>;
-def : PatGprGpr<riscx_sraw, SRAW>;
-
-/// Loads
-
-defm : LdPat<sextloadi32, LW>;
-defm : LdPat<extloadi32, LW>;
-defm : LdPat<zextloadi32, LWU>;
-defm : LdPat<load, LD>;
-
-/// Stores
-
-defm : StPat<truncstorei32, SW, GPR>;
-defm : StPat<store, SD, GPR>;
-} // Predicates = [IsRV64]
-
 /// readcyclecounter
-// On RV64, we can directly read the 64-bit "cycle" CSR.
-let Predicates = [IsRV64] in
-def : Pat<(readcyclecounter), (CSRRS CYCLE.Encoding, X0)>;
 // On RV32, ReadCycleWide will be expanded to the suggested loop reading both
 // halves of the 64-bit "cycle" CSR.
 let Predicates = [IsRV32], usesCustomInserter = 1, hasSideEffects = 0,
@@ -1116,13 +1017,3 @@ def : Pat<(trap), (UNIMP)>;
 // We lower `debugtrap` to `ebreak`, as this will get the attention of the
 // debugger if possible.
 def : Pat<(debugtrap), (EBREAK)>;
-
-//===----------------------------------------------------------------------===//
-// Standard extensions
-//===----------------------------------------------------------------------===//
-
-include "RISCXInstrInfoM.td"
-include "RISCXInstrInfoA.td"
-include "RISCXInstrInfoF.td"
-include "RISCXInstrInfoD.td"
-include "RISCXInstrInfoC.td"
