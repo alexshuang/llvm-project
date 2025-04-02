@@ -30,7 +30,6 @@
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/IR/IntrinsicsRISCX.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -251,24 +250,6 @@ bool RISCXTargetLowering::getTgtMemIntrinsic(IntrinsicInfo &Info,
   switch (Intrinsic) {
   default:
     return false;
-  case Intrinsic::riscx_masked_atomicrmw_xchg_i32:
-  case Intrinsic::riscx_masked_atomicrmw_add_i32:
-  case Intrinsic::riscx_masked_atomicrmw_sub_i32:
-  case Intrinsic::riscx_masked_atomicrmw_nand_i32:
-  case Intrinsic::riscx_masked_atomicrmw_max_i32:
-  case Intrinsic::riscx_masked_atomicrmw_min_i32:
-  case Intrinsic::riscx_masked_atomicrmw_umax_i32:
-  case Intrinsic::riscx_masked_atomicrmw_umin_i32:
-  case Intrinsic::riscx_masked_cmpxchg_i32:
-    PointerType *PtrTy = cast<PointerType>(I.getArgOperand(0)->getType());
-    Info.opc = ISD::INTRINSIC_W_CHAIN;
-    Info.memVT = MVT::getVT(PtrTy->getElementType());
-    Info.ptrVal = I.getArgOperand(0);
-    Info.offset = 0;
-    Info.align = Align(4);
-    Info.flags = MachineMemOperand::MOLoad | MachineMemOperand::MOStore |
-                 MachineMemOperand::MOVolatile;
-    return true;
   }
 }
 
@@ -1263,8 +1244,6 @@ static bool isSelectPseudo(MachineInstr &MI) {
   default:
     return false;
   case RISCX::Select_GPR_Using_CC_GPR:
-  case RISCX::Select_FPR32_Using_CC_GPR:
-  case RISCX::Select_FPR64_Using_CC_GPR:
     return true;
   }
 }
@@ -1402,14 +1381,6 @@ RISCXTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
     assert(!Subtarget.is64Bit() &&
            "ReadCycleWrite is only to be used on riscx32");
     return emitReadCycleWidePseudo(MI, BB);
-  case RISCX::Select_GPR_Using_CC_GPR:
-  case RISCX::Select_FPR32_Using_CC_GPR:
-  case RISCX::Select_FPR64_Using_CC_GPR:
-    return emitSelectPseudo(MI, BB);
-  case RISCX::BuildPairF64Pseudo:
-    return emitBuildPairF64Pseudo(MI, BB);
-  case RISCX::SplitF64Pseudo:
-    return emitSplitF64Pseudo(MI, BB);
   }
 }
 
@@ -2798,22 +2769,6 @@ getIntrinsicForMaskedAtomicRMWBinOp(unsigned XLen, AtomicRMWInst::BinOp BinOp) {
     switch (BinOp) {
     default:
       llvm_unreachable("Unexpected AtomicRMW BinOp");
-    case AtomicRMWInst::Xchg:
-      return Intrinsic::riscx_masked_atomicrmw_xchg_i32;
-    case AtomicRMWInst::Add:
-      return Intrinsic::riscx_masked_atomicrmw_add_i32;
-    case AtomicRMWInst::Sub:
-      return Intrinsic::riscx_masked_atomicrmw_sub_i32;
-    case AtomicRMWInst::Nand:
-      return Intrinsic::riscx_masked_atomicrmw_nand_i32;
-    case AtomicRMWInst::Max:
-      return Intrinsic::riscx_masked_atomicrmw_max_i32;
-    case AtomicRMWInst::Min:
-      return Intrinsic::riscx_masked_atomicrmw_min_i32;
-    case AtomicRMWInst::UMax:
-      return Intrinsic::riscx_masked_atomicrmw_umax_i32;
-    case AtomicRMWInst::UMin:
-      return Intrinsic::riscx_masked_atomicrmw_umin_i32;
     }
   }
 
@@ -2821,22 +2776,6 @@ getIntrinsicForMaskedAtomicRMWBinOp(unsigned XLen, AtomicRMWInst::BinOp BinOp) {
     switch (BinOp) {
     default:
       llvm_unreachable("Unexpected AtomicRMW BinOp");
-    case AtomicRMWInst::Xchg:
-      return Intrinsic::riscx_masked_atomicrmw_xchg_i64;
-    case AtomicRMWInst::Add:
-      return Intrinsic::riscx_masked_atomicrmw_add_i64;
-    case AtomicRMWInst::Sub:
-      return Intrinsic::riscx_masked_atomicrmw_sub_i64;
-    case AtomicRMWInst::Nand:
-      return Intrinsic::riscx_masked_atomicrmw_nand_i64;
-    case AtomicRMWInst::Max:
-      return Intrinsic::riscx_masked_atomicrmw_max_i64;
-    case AtomicRMWInst::Min:
-      return Intrinsic::riscx_masked_atomicrmw_min_i64;
-    case AtomicRMWInst::UMax:
-      return Intrinsic::riscx_masked_atomicrmw_umax_i64;
-    case AtomicRMWInst::UMin:
-      return Intrinsic::riscx_masked_atomicrmw_umin_i64;
     }
   }
 
@@ -2898,23 +2837,7 @@ RISCXTargetLowering::shouldExpandAtomicCmpXchgInIR(
 Value *RISCXTargetLowering::emitMaskedAtomicCmpXchgIntrinsic(
     IRBuilder<> &Builder, AtomicCmpXchgInst *CI, Value *AlignedAddr,
     Value *CmpVal, Value *NewVal, Value *Mask, AtomicOrdering Ord) const {
-  unsigned XLen = Subtarget.getXLen();
-  Value *Ordering = Builder.getIntN(XLen, static_cast<uint64_t>(Ord));
-  Intrinsic::ID CmpXchgIntrID = Intrinsic::riscx_masked_cmpxchg_i32;
-  if (XLen == 64) {
-    CmpVal = Builder.CreateSExt(CmpVal, Builder.getInt64Ty());
-    NewVal = Builder.CreateSExt(NewVal, Builder.getInt64Ty());
-    Mask = Builder.CreateSExt(Mask, Builder.getInt64Ty());
-    CmpXchgIntrID = Intrinsic::riscx_masked_cmpxchg_i64;
-  }
-  Type *Tys[] = {AlignedAddr->getType()};
-  Function *MaskedCmpXchg =
-      Intrinsic::getDeclaration(CI->getModule(), CmpXchgIntrID, Tys);
-  Value *Result = Builder.CreateCall(
-      MaskedCmpXchg, {AlignedAddr, CmpVal, NewVal, Mask, Ordering});
-  if (XLen == 64)
-    Result = Builder.CreateTrunc(Result, Builder.getInt32Ty());
-  return Result;
+  return nullptr;
 }
 
 unsigned RISCXTargetLowering::getExceptionPointerRegister(

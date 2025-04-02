@@ -214,16 +214,9 @@ bool RISCXMergeBaseOffsetOpt::detectAndFoldOffset(MachineInstr &HiLUI,
   case RISCX::LW:
   case RISCX::LBU:
   case RISCX::LHU:
-  case RISCX::LWU:
-  case RISCX::LD:
-  case RISCX::FLW:
-  case RISCX::FLD:
   case RISCX::SB:
   case RISCX::SH:
-  case RISCX::SW:
-  case RISCX::SD:
-  case RISCX::FSW:
-  case RISCX::FSD: {
+  case RISCX::SW: {
     // Transforms the sequence:            Into:
     // HiLUI:  lui vreg1, %hi(foo)          --->  lui vreg1, %hi(foo+8)
     // LoADDI: addi vreg2, vreg1, %lo(foo)  --->  lw vreg3, lo(foo+8)(vreg1)

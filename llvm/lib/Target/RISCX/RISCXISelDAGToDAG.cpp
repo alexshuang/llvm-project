@@ -134,27 +134,7 @@ void RISCXDAGToDAGISel::Select(SDNode *Node) {
     return;
   }
   case ISD::SRL: {
-    if (!Subtarget->is64Bit())
-      break;
-    SDValue Op0 = Node->getOperand(0);
-    SDValue Op1 = Node->getOperand(1);
-    uint64_t Mask;
-    // Match (srl (and val, mask), imm) where the result would be a
-    // zero-extended 32-bit integer. i.e. the mask is 0xffffffff or the result
-    // is equivalent to this (SimplifyDemandedBits may have removed lower bits
-    // from the mask that aren't necessary due to the right-shifting).
-    if (Op1.getOpcode() == ISD::Constant &&
-        isConstantMask(Op0.getNode(), Mask)) {
-      uint64_t ShAmt = cast<ConstantSDNode>(Op1.getNode())->getZExtValue();
-
-      if ((Mask | maskTrailingOnes<uint64_t>(ShAmt)) == 0xffffffff) {
-        SDValue ShAmtVal =
-            CurDAG->getTargetConstant(ShAmt, SDLoc(Node), XLenVT);
-        CurDAG->SelectNodeTo(Node, RISCX::SRLIW, XLenVT, Op0.getOperand(0),
-                             ShAmtVal);
-        return;
-      }
-    }
+    assert(!Subtarget->is64Bit() && "ISD::SRL is only used on riscx 32-bit");
     break;
   }
   case RISCXISD::READ_CYCLE_WIDE:
@@ -221,19 +201,12 @@ void RISCXDAGToDAGISel::doPeepholeLoadStoreADDI() {
     case RISCX::LW:
     case RISCX::LBU:
     case RISCX::LHU:
-    case RISCX::LWU:
-    case RISCX::LD:
-    case RISCX::FLW:
-    case RISCX::FLD:
       BaseOpIdx = 0;
       OffsetOpIdx = 1;
       break;
     case RISCX::SB:
     case RISCX::SH:
     case RISCX::SW:
-    case RISCX::SD:
-    case RISCX::FSW:
-    case RISCX::FSD:
       BaseOpIdx = 1;
       OffsetOpIdx = 2;
       break;

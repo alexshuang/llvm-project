@@ -52,8 +52,6 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCXDisassembler() {
   // Register the disassembler for each target.
   TargetRegistry::RegisterMCDisassembler(getTheRISCX32Target(),
                                          createRISCXDisassembler);
-  TargetRegistry::RegisterMCDisassembler(getTheRISCX64Target(),
-                                         createRISCXDisassembler);
 }
 
 static DecodeStatus DecodeGPRRegisterClass(MCInst &Inst, uint64_t RegNo,
@@ -151,19 +149,6 @@ static DecodeStatus DecodeGPRCRegisterClass(MCInst &Inst, uint64_t RegNo,
 // Add implied SP operand for instructions *SP compressed instructions. The SP
 // operand isn't explicitly encoded in the instruction.
 static void addImplySP(MCInst &Inst, int64_t Address, const void *Decoder) {
-  if (Inst.getOpcode() == RISCX::C_LWSP || Inst.getOpcode() == RISCX::C_SWSP ||
-      Inst.getOpcode() == RISCX::C_LDSP || Inst.getOpcode() == RISCX::C_SDSP ||
-      Inst.getOpcode() == RISCX::C_FLWSP ||
-      Inst.getOpcode() == RISCX::C_FSWSP ||
-      Inst.getOpcode() == RISCX::C_FLDSP ||
-      Inst.getOpcode() == RISCX::C_FSDSP ||
-      Inst.getOpcode() == RISCX::C_ADDI4SPN) {
-    DecodeGPRRegisterClass(Inst, 2, Address, Decoder);
-  }
-  if (Inst.getOpcode() == RISCX::C_ADDI16SP) {
-    DecodeGPRRegisterClass(Inst, 2, Address, Decoder);
-    DecodeGPRRegisterClass(Inst, 2, Address, Decoder);
-  }
 }
 
 template <unsigned N>
@@ -330,29 +315,6 @@ DecodeStatus RISCXDisassembler::getInstruction(MCInst &MI, uint64_t &Size,
     LLVM_DEBUG(dbgs() << "Trying RISCX32 table :\n");
     Result = decodeInstruction(DecoderTable32, MI, Insn, Address, this, STI);
     Size = 4;
-  } else {
-    if (Bytes.size() < 2) {
-      Size = 0;
-      return MCDisassembler::Fail;
-    }
-    Insn = support::endian::read16le(Bytes.data());
-
-    if (!STI.getFeatureBits()[RISCX::Feature64Bit]) {
-      LLVM_DEBUG(
-          dbgs() << "Trying RISCX32Only_16 table (16-bit Instruction):\n");
-      // Calling the auto-generated decoder function.
-      Result = decodeInstruction(DecoderTableRISCX32Only_16, MI, Insn, Address,
-                                 this, STI);
-      if (Result != MCDisassembler::Fail) {
-        Size = 2;
-        return Result;
-      }
-    }
-
-    LLVM_DEBUG(dbgs() << "Trying RISCX_C table (16-bit Instruction):\n");
-    // Calling the auto-generated decoder function.
-    Result = decodeInstruction(DecoderTable16, MI, Insn, Address, this, STI);
-    Size = 2;
   }
 
   return Result;

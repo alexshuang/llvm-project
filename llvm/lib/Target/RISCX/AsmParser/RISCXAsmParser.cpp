@@ -41,9 +41,6 @@ using namespace llvm;
 #define DEBUG_TYPE "riscx-asm-parser"
 
 // Include the auto-generated portion of the compress emitter.
-#define GEN_COMPRESS_INSTR
-#include "RISCXGenCompressInstEmitter.inc"
-
 STATISTIC(RISCXNumInstrsCompressed,
           "Number of RISC-V Compressed instructions emitted");
 
@@ -882,60 +879,13 @@ bool RISCXAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     if (isRV64())
       return generateImmOutOfRangeError(Operands, ErrorInfo, 0, (1 << 6) - 1);
     return generateImmOutOfRangeError(Operands, ErrorInfo, 0, (1 << 5) - 1);
-  case Match_InvalidUImmLog2XLenNonZero:
-    if (isRV64())
-      return generateImmOutOfRangeError(Operands, ErrorInfo, 1, (1 << 6) - 1);
-    return generateImmOutOfRangeError(Operands, ErrorInfo, 1, (1 << 5) - 1);
   case Match_InvalidUImm5:
     return generateImmOutOfRangeError(Operands, ErrorInfo, 0, (1 << 5) - 1);
-  case Match_InvalidSImm6:
-    return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 5),
-                                      (1 << 5) - 1);
-  case Match_InvalidSImm6NonZero:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, -(1 << 5), (1 << 5) - 1,
-        "immediate must be non-zero in the range");
-  case Match_InvalidCLUIImm:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, 1, (1 << 5) - 1,
-        "immediate must be in [0xfffe0, 0xfffff] or");
-  case Match_InvalidUImm7Lsb00:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, 0, (1 << 7) - 4,
-        "immediate must be a multiple of 4 bytes in the range");
-  case Match_InvalidUImm8Lsb00:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, 0, (1 << 8) - 4,
-        "immediate must be a multiple of 4 bytes in the range");
-  case Match_InvalidUImm8Lsb000:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, 0, (1 << 8) - 8,
-        "immediate must be a multiple of 8 bytes in the range");
-  case Match_InvalidSImm9Lsb0:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, -(1 << 8), (1 << 8) - 2,
-        "immediate must be a multiple of 2 bytes in the range");
-  case Match_InvalidUImm9Lsb000:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, 0, (1 << 9) - 8,
-        "immediate must be a multiple of 8 bytes in the range");
-  case Match_InvalidUImm10Lsb00NonZero:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, 4, (1 << 10) - 4,
-        "immediate must be a multiple of 4 bytes in the range");
-  case Match_InvalidSImm10Lsb0000NonZero:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, -(1 << 9), (1 << 9) - 16,
-        "immediate must be a multiple of 16 bytes and non-zero in the range");
   case Match_InvalidSImm12:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, -(1 << 11), (1 << 11) - 1,
         "operand must be a symbol with %lo/%pcrel_lo/%tprel_lo modifier or an "
         "integer in the range");
-  case Match_InvalidSImm12Lsb0:
-    return generateImmOutOfRangeError(
-        Operands, ErrorInfo, -(1 << 11), (1 << 11) - 2,
-        "immediate must be a multiple of 2 bytes in the range");
   case Match_InvalidSImm13Lsb0:
     return generateImmOutOfRangeError(
         Operands, ErrorInfo, -(1 << 12), (1 << 12) - 2,
@@ -965,12 +915,6 @@ bool RISCXAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     return Error(
         ErrorLoc,
         "operand must be formed of letters selected in-order from 'iorw'");
-  }
-  case Match_InvalidFRMArg: {
-    SMLoc ErrorLoc = ((RISCXOperand &)*Operands[ErrorInfo]).getStartLoc();
-    return Error(
-        ErrorLoc,
-        "operand must be a valid floating point rounding mode mnemonic");
   }
   case Match_InvalidBareSymbol: {
     SMLoc ErrorLoc = ((RISCXOperand &)*Operands[ErrorInfo]).getStartLoc();
@@ -1633,10 +1577,7 @@ bool RISCXAsmParser::parseDirectiveOption() {
 
 void RISCXAsmParser::emitToStreamer(MCStreamer &S, const MCInst &Inst) {
   MCInst CInst;
-  bool Res = compressInst(CInst, Inst, getSTI(), S.getContext());
-  if (Res)
-    ++RISCXNumInstrsCompressed;
-  S.EmitInstruction((Res ? CInst : Inst), getSTI());
+  S.EmitInstruction(Inst, getSTI());
 }
 
 void RISCXAsmParser::emitLoadImm(Register DestReg, int64_t Value,
@@ -1719,7 +1660,7 @@ void RISCXAsmParser::emitLoadAddress(MCInst &Inst, SMLoc IDLoc,
   RISCXMCExpr::VariantKind VKHi;
   // FIXME: Should check .option (no)pic when implemented
   if (getContext().getObjectFileInfo()->isPositionIndependent()) {
-    SecondOpcode = isRV64() ? RISCX::LD : RISCX::LW;
+    SecondOpcode = RISCX::LW;
     VKHi = RISCXMCExpr::VK_RISCX_GOT_HI;
   } else {
     SecondOpcode = RISCX::ADDI;
@@ -1738,7 +1679,7 @@ void RISCXAsmParser::emitLoadTLSIEAddress(MCInst &Inst, SMLoc IDLoc,
   //             Lx rdest, %pcrel_lo(TmpLabel)(rdest)
   MCOperand DestReg = Inst.getOperand(0);
   const MCExpr *Symbol = Inst.getOperand(1).getExpr();
-  unsigned SecondOpcode = isRV64() ? RISCX::LD : RISCX::LW;
+  unsigned SecondOpcode = RISCX::LW;
   emitAuipcInstPair(DestReg, DestReg, Symbol, RISCXMCExpr::VK_RISCX_TLS_GOT_HI,
                     SecondOpcode, IDLoc, Out);
 }
@@ -1845,18 +1786,6 @@ bool RISCXAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
   case RISCX::PseudoLW:
     emitLoadStoreSymbol(Inst, RISCX::LW, IDLoc, Out, /*HasTmpReg=*/false);
     return false;
-  case RISCX::PseudoLWU:
-    emitLoadStoreSymbol(Inst, RISCX::LWU, IDLoc, Out, /*HasTmpReg=*/false);
-    return false;
-  case RISCX::PseudoLD:
-    emitLoadStoreSymbol(Inst, RISCX::LD, IDLoc, Out, /*HasTmpReg=*/false);
-    return false;
-  case RISCX::PseudoFLW:
-    emitLoadStoreSymbol(Inst, RISCX::FLW, IDLoc, Out, /*HasTmpReg=*/true);
-    return false;
-  case RISCX::PseudoFLD:
-    emitLoadStoreSymbol(Inst, RISCX::FLD, IDLoc, Out, /*HasTmpReg=*/true);
-    return false;
   case RISCX::PseudoSB:
     emitLoadStoreSymbol(Inst, RISCX::SB, IDLoc, Out, /*HasTmpReg=*/true);
     return false;
@@ -1865,15 +1794,6 @@ bool RISCXAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
     return false;
   case RISCX::PseudoSW:
     emitLoadStoreSymbol(Inst, RISCX::SW, IDLoc, Out, /*HasTmpReg=*/true);
-    return false;
-  case RISCX::PseudoSD:
-    emitLoadStoreSymbol(Inst, RISCX::SD, IDLoc, Out, /*HasTmpReg=*/true);
-    return false;
-  case RISCX::PseudoFSW:
-    emitLoadStoreSymbol(Inst, RISCX::FSW, IDLoc, Out, /*HasTmpReg=*/true);
-    return false;
-  case RISCX::PseudoFSD:
-    emitLoadStoreSymbol(Inst, RISCX::FSD, IDLoc, Out, /*HasTmpReg=*/true);
     return false;
   case RISCX::PseudoAddTPRel:
     if (checkPseudoAddTPRel(Inst, Operands))
@@ -1887,5 +1807,4 @@ bool RISCXAsmParser::processInstruction(MCInst &Inst, SMLoc IDLoc,
 
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCXAsmParser() {
   RegisterMCAsmParser<RISCXAsmParser> X(getTheRISCX32Target());
-  RegisterMCAsmParser<RISCXAsmParser> Y(getTheRISCX64Target());
 }

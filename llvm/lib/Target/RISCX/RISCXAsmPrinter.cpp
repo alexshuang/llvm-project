@@ -62,15 +62,9 @@ public:
 };
 }
 
-#define GEN_COMPRESS_INSTR
-#include "RISCXGenCompressInstEmitter.inc"
 void RISCXAsmPrinter::EmitToStreamer(MCStreamer &S, const MCInst &Inst) {
   MCInst CInst;
-  bool Res = compressInst(CInst, Inst, *TM.getMCSubtargetInfo(),
-                          OutStreamer->getContext());
-  if (Res)
-    ++RISCXNumInstrsCompressed;
-  AsmPrinter::EmitToStreamer(*OutStreamer, Res ? CInst : Inst);
+  AsmPrinter::EmitToStreamer(*OutStreamer, Inst);
 }
 
 // Simple pseudo-instructions have their lowering (with expansion to real
@@ -157,5 +151,4 @@ bool RISCXAsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
 // Force static initialization.
 extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCXAsmPrinter() {
   RegisterAsmPrinter<RISCXAsmPrinter> X(getTheRISCX32Target());
-  RegisterAsmPrinter<RISCXAsmPrinter> Y(getTheRISCX64Target());
 }

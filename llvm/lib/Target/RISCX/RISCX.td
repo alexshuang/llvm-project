@@ -97,23 +97,12 @@ include "RISCXRegisterInfo.td"
 include "RISCXCallingConv.td"
 include "RISCXInstrInfo.td"
 include "RISCXRegisterBanks.td"
-include "RISCXSchedRocket32.td"
-include "RISCXSchedRocket64.td"
 
 //===----------------------------------------------------------------------===//
 // RISC-V processors supported.
 //===----------------------------------------------------------------------===//
 
 def : ProcessorModel<"generic-rv32", NoSchedModel, [FeatureRVCHints]>;
-
-def : ProcessorModel<"generic-rv64", NoSchedModel, [Feature64Bit,
-                     FeatureRVCHints]>;
-
-def : ProcessorModel<"rocket-rv32", Rocket32Model, [FeatureRVCHints]>;
-
-def : ProcessorModel<"rocket-rv64", Rocket64Model, [Feature64Bit,
-                     FeatureRVCHints]>;
-
 
 //===----------------------------------------------------------------------===//
 // Define the RISC-V target.
